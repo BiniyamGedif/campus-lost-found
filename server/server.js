@@ -1,8 +1,14 @@
 // server.js - Entry point for the Campus Lost and Found backend API.
-// This file sets up the Express application and starts the HTTP server.
-// Database connection and advanced middleware are added in later phases.
+
+// Load environment variables from .env into process.env FIRST,
+// before any other module reads them.
+require('dotenv').config();
 
 const express = require('express');
+const connectDB = require('./config/db');
+
+// Connect to the local MongoDB database.
+connectDB();
 
 // Create the Express application instance.
 const app = express();
