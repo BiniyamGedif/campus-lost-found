@@ -8,6 +8,7 @@ const router = express.Router();
 const { createItem, getItems, getItem, updateItem, deleteItem, recoverItem } = require('../controllers/itemController');
 const { protect } = require('../middleware/authMiddleware');
 const { validationResult } = require('express-validator');
+const { uploadSingleImage } = require('../middleware/uploadMiddleware');
 
 const handleValidation = (req, res, next) => {
   const errors = validationResult(req);
@@ -29,7 +30,7 @@ const createValidation = [
 
 router.get('/', getItems);
 router.get('/:id', getItem);
-router.post('/', protect, createValidation, handleValidation, createItem);
+router.post('/', protect, uploadSingleImage, createValidation, handleValidation, createItem);
 router.put('/:id', protect, updateItem);
 router.delete('/:id', protect, deleteItem);
 router.patch('/:id/recover', protect, recoverItem);
