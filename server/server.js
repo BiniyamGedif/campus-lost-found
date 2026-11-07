@@ -1,32 +1,76 @@
 // server.js - Entry point for the Campus Lost and Found backend API.
 
-// Load environment variables from .env into process.env FIRST,
-// before any other module reads them.
 require('dotenv').config();
 
 const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const cookieParser = require('cookie-parser');
+const rateLimit = require('express-rate-limit');
+
 const connectDB = require('./config/db');
+const { notFound, errorHandler } = require('./middleware/errorMiddleware');
+
+const authRoutes = require('./routes/authRoutes');
+const itemRoutes = require('./routes/itemRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 // Connect to the local MongoDB database.
 connectDB();
 
-// Create the Express application instance.
 const app = express();
 
-// Basic middleware to parse JSON request bodies.
-app.use(express.json());
+// Security headers.
+app.use(helmet());
 
-// Simple health-check route so we can verify the server is running.
+// Logging in development.
+if (process.env.NODE_ENV !== 'production') {
+  app.use(morgan('dev'));
+}
+
+// CORS: allow the frontend origin to send cookies/credentials.
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    credentials: true,
+  })
+);
+
+// Parse JSON and URL-encoded bodies.
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Parse cookies (needed for JWT auth cookies later).
+app.use(cookieParser());
+
+// Basic rate limiting for all API routes.
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many requests, please try again later.' },
+});
+app.use('/api', apiLimiter);
+
+// Health check route.
 app.get('/api/health', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Campus Lost and Found API is running',
-  });
+  res.status(200).json({ success: true, message: 'Campus Lost and Found API is running' });
 });
 
-// Use PORT from environment or default to 5000.
-const PORT = process.env.PORT || 5000;
+// Mount route modules.
+app.use('/api/auth', authRoutes);
+app.use('/api/items', itemRoutes);
+app.use('/api/admin', adminRoutes);
 
+// 404 handler for unknown routes.
+app.use(notFound);
+
+// Centralized error handler (must be last).
+app.use(errorHandler);
+
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
