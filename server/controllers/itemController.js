@@ -41,13 +41,51 @@ const createItem = async (req, res, next) => {
   }
 };
 
-// @desc    Get all reports (basic listing; filters/pagination in Phase 10)
+// @desc    Get all reports (search, filter, sort, paginate)
 // @route   GET /api/items
 // @access  Public
 const getItems = async (req, res, next) => {
   try {
-    const items = await Item.find().populate('user', 'name email').sort({ createdAt: -1 });
-    res.status(200).json({ success: true, count: items.length, items });
+    const { page = 1, limit = 12, sort = 'newest', category, reportType, status, location, q } = req.query;
+
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 12));
+    const skip = (pageNum - 1) * limitNum;
+
+    const filters = {};
+
+    if (category) filters.category = category.trim();
+    if (reportType) filters.reportType = reportType.trim();
+    if (status) filters.status = status.trim();
+    if (location) filters.location = new RegExp(location.trim(), 'i');
+    if (q) {
+      filters.$or = [
+        { name: new RegExp(q.trim(), 'i') },
+        { description: new RegExp(q.trim(), 'i') },
+      ];
+    }
+
+    const sortMap = {
+      newest: { createdAt: -1 },
+      oldest: { createdAt: 1 },
+      name: { name: 1 },
+    };
+
+    const query = Item.find(filters)
+      .sort(sortMap[sort] || sortMap.newest)
+      .skip(skip)
+      .limit(limitNum);
+
+    const [items, total] = await Promise.all([query, Item.countDocuments(filters)]);
+
+    res.status(200).json({
+      success: true,
+      count: items.length,
+      page: pageNum,
+      totalPages: Math.ceil(total / limitNum),
+      total,
+      items,
+    });
   } catch (error) {
     next(error);
   }
@@ -93,7 +131,6 @@ const updateItem = async (req, res, next) => {
     });
 
     if (req.file) {
-      // Delete the previous image before uploading the new one
       if (item.imagePublicId) {
         await deleteImage(item.imagePublicId);
       }
