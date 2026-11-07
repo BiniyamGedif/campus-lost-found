@@ -57,15 +57,13 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-// Index for fast email lookups (also enforces uniqueness).
-userSchema.index({ email: 1 }, { unique: true });
+// unique: true on the email field already creates an index.
 
 // Hash the password before saving if it was modified.
-userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
+userSchema.pre('save', async function () {
+  if (!this.isModified('password')) return;
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
-  next();
 });
 
 // Instance method to compare a candidate password with the stored hash.
